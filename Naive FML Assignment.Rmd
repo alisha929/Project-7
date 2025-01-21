@@ -1,0 +1,249 @@
+---
+title: "Naive Bayse Assignment"
+author: "Alisha Ghatani"
+date: "2024-10-11"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load Required Libraries
+
+```{r}
+library(caret)
+library(e1071)
+library(dplyr)
+library(tinytex)
+```
+
+
+```{r}
+file_path <- "C:/Users/HP/Downloads/Heart_disease.csv"
+file.exists(file_path)  # Should return TRUE if the file exists
+
+```
+
+#load the data
+
+```{r}
+Heart_disease <- read.csv("C:\\Users\\HP\\Downloads\\Heart_disease.csv")
+str(Heart_disease)
+```
+
+```{r}
+dim(Heart_disease)
+summary(Heart_disease)
+```
+
+Heart disease has 303 rows and 9 columns. This means the dataset contains data for 303 individuals, each with 9 variables or features related to heart disease.
+
+
+The dataset summarizes key health indicators related to cardiovascular health. The patients, aged 29 to 77 (mean age: 54.37), show a higher proportion of males (68%). Blood pressure ranges from 94 to 200, with an average of 131.6, and cholesterol levels vary between 126 and 564 (mean: 246.3). Most patients have normal fasting blood sugar (85% with levels below 120 mg/dL) and a resting ECG result around 1. The maximum heart rate achieved ranges from 71 to 202 (median: 153), and about one-third of the patients experience exercise-induced angina. The majority have chest pain type 0. 
+
+
+
+
+
+# Question 1. Prediction Based on Initial Information
+
+If a person with chest pain presents without any further information, we should examine the Target variable in the dataset to assess the overall probability of heart disease.
+
+#Create Dummy Variabless:
+
+To facilitate the prediction, we will create two dummy variables: Target and BP_New.
+```{r}
+# Create the 'Target' variable
+Heart_disease$Target <- ifelse(Heart_disease$MAX_HeartRate > 170, "Yes", "No")
+
+# Create the 'BP_New' variable
+Heart_disease$BP_New <- ifelse(Heart_disease$Blood_Pressure > 120, "Yes", "No")
+
+# Verify the unique values in the 'Target' variable
+head(Heart_disease)
+
+
+```
+
+#Analyze the Target Variable:
+
+Next, we will analyze the distribution of the Target variable using a frequency table.
+
+```{r}
+# Create a table of the 'Target' variable
+Target_table <- table(Heart_disease$Target)
+Target_table
+Prob_no <- Target_table["No"]/sum(Target_table)
+Prob_no
+
+```
+
+The Target_table shows the distribution of the Target variable, where 245 instances (80.86%) are classified as "No" (no heart disease), and 58 instances (19.14%) are classified as "Yes" (presence of heart disease). The probability Prob_no, which represents the proportion of instances without heart disease, is approximately 0.809. This indicates that in this dataset, around 81% of the individuals do not have heart disease, making it a majority class.
+
+
+
+
+
+
+
+
+
+
+# Question 2. Analysis of the first 30 Records
+
+```{r}
+Heart_disease30 <- Heart_disease[1:30, c("Target", "BP_New", "chest_pain_type")]
+head(Heart_disease30)
+Object1 <- ftable(Heart_disease30)
+Object2 <- ftable(Heart_disease30[, -1])
+Object1
+Object2
+
+```
+
+The frequency tables derived from the subset of the dataset (Heart_disease30) reveal a significant association between the presence of heart disease (Target) and the predictors of blood pressure status (BP_New) and chest pain type. In the first table, individuals without heart disease exhibit varied counts across blood pressure statuses and chest pain types, while those with heart disease predominantly show high blood pressure and a notable occurrence of chest pain type 1. The second table emphasizes that individuals with high blood pressure are more likely to experience chest pain, with counts of 10 and 13 for chest pain types 0 and 1, respectively. These findings suggest a potential correlation between high blood pressure and the risk of heart disease, highlighting chest pain type as a critical factor in predicting heart conditions within this dataset.
+
+
+
+#a.Computing Bayes Conditional Probabilities:
+```{r}
+P1 = Object1[3, 1] / Object2[1, 1]  # Target=yes, BP_New=No, chest_pain_type=0
+P2 = Object1[3, 2] / Object2[1, 2]  # Target=yes, BP_New=No, chest_pain_type=1
+P3 = Object1[4, 1] / Object2[2, 1]  # Target=yes, BP_New=Yes, chest_pain_type=0
+P4 = Object1[4, 2] / Object2[2, 2]  # Target=yes, BP_New=Yes, chest_pain_type=1
+
+# Output the probabilities
+print(c(P1, P2, P3, P4))
+```
+
+The calculated probabilities reveal key relationships between heart disease (Target = Yes) and the predictors of blood pressure status (BP_New) and chest pain type. Specifically, P1 indicates a 0% likelihood of heart disease for those with low blood pressure and chest pain type 0. In contrast, P2 shows a strong 60% probability of heart disease for individuals with high blood pressure and chest pain type 1. Additionally, P3 and P4 reflect probabilities of 30% and approximately 38% for those with high blood pressure and chest pain types 0 and 1, respectively. These results underscore the significant role of blood pressure and chest pain type in predicting heart disease risk.
+
+
+#b.Classification of Accidents:
+```{r}
+# Initialize Probability_Target for each record
+Probability_Target <- rep(0, 30)
+
+# Loop to assign probabilities for each record based on predictors
+for (i in 1:30) {
+    if (Heart_disease30$BP_New[i] == "No" & Heart_disease30$chest_pain_type[i] == 0) {
+        Probability_Target[i] <- P1
+    } else if (Heart_disease30$BP_New[i] == "Yes" & Heart_disease30$chest_pain_type[i] == 0) {
+        Probability_Target[i] <- P2
+    } else if (Heart_disease30$BP_New[i] == "No" & Heart_disease30$chest_pain_type[i] == 1) {
+        Probability_Target[i] <- P3
+    } else {
+        Probability_Target[i] <- P4
+    }
+}
+
+# Add predictions to the dataset
+Heart_disease30$Probability_Target <- Probability_Target
+Heart_disease30$Pred_Probability <- ifelse(Heart_disease30$Probability_Target > 0.5, "Yes", "No")
+cat("Predicted probabilities for the first 30 records:\n")
+print(Heart_disease30[,c("Target", "BP_New", "chest_pain_type", "Pred_Probability")])
+```
+
+
+
+
+#c.Manual Calculation of Naive Bayes Probability:
+
+To manual compute the Naive Bayes conditional probability of an injury given that "BP_New" is "Yes" and "chest_pain_type is 1, we need to use the following formula:
+
+```{r}
+P_injury <- P4 # Based on BP_New = yes and chest_pain_type = 1
+cat("Naive Bayes probability for BP_New = yes and chest_pain_type =1:", P_injury, "\n")
+```
+
+The Naive Bayes probability of approximately 38.46% for having heart disease (Target = Yes) when blood pressure is high (BP_New = Yes) and chest pain type is 1 indicates a moderate level of risk associated with these conditions. This probability suggests that among individuals exhibiting both high blood pressure and chest pain type 1, roughly one in three may have heart disease. This finding highlights the importance of monitoring both blood pressure and chest pain symptoms in assessing heart disease risk, emphasizing the potential need for further medical evaluation in such patients.
+
+
+#Improved Naive Bayes Calculation for Q2c
+```{r}
+
+# Calculate prior probability of Target = "Yes"
+P_Target_Yes <- sum(Heart_disease30$Target == "Yes") / nrow(Heart_disease30)
+
+# Calculate conditional probabilities
+P_BP_New_Yes_given_Target_Yes <- sum(Heart_disease30$BP_New == "Yes" & Heart_disease30$Target == "Yes") / sum(Heart_disease30$Target == "Yes")
+P_chest_pain_type_1_given_Target_Yes <- sum(Heart_disease30$chest_pain_type == 1 & Heart_disease30$Target == "Yes") / sum(Heart_disease30$Target == "Yes")
+
+# Calculate Naive Bayes probability
+P_injury <- P_Target_Yes * P_BP_New_Yes_given_Target_Yes * P_chest_pain_type_1_given_Target_Yes
+cat("Naive Bayes probability for BP_New=Yes & chest_pain_type=1: ", P_injury, "\n")
+
+# Compare with previous result
+cat("Previous calculation (P4): ", P4, "\n")
+
+```
+
+The Naive Bayes probability of approximately 19.39% for having heart disease (Target = Yes) with high blood pressure (BP_New = Yes) and chest pain type 1 is significantly lower than the previous 38.46% from the frequency-based method. This difference stems from the use of prior probabilities in the current calculation, which provides a more comprehensive assessment by factoring in the overall distribution of heart disease. The lower probability indicates that while these symptoms are associated with heart disease, the actual risk is less pronounced, underscoring the importance of a thorough statistical approach for accurate risk assessment.
+
+
+
+
+# Question 3. Full dataset Analysis
+#split the data (60% on training and 40% on validation)
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Split data into training (60%) and validation (40%)
+train.index <- sample(row.names(Heart_disease), 0.6 * dim(Heart_disease)[1])
+valid.index <- setdiff(row.names(Heart_disease), train.index)
+
+train.df <- Heart_disease[train.index, ]
+valid.df <- Heart_disease[valid.index, ]
+
+
+# Train the model
+nb_model <- train(Target ~ chest_pain_type + BP_New, data = train.df, method = "naive_bayes")
+
+
+
+# Assuming you have already trained your Naive Bayes model and made predictions
+train_pred <- predict(nb_model, train.df)
+
+# Ensure that the 'Target' column in the training dataset is a factor
+train.df$Target <- factor(train.df$Target)
+
+# Ensure the predictions are factors with the same levels as 'Target'
+train_pred <- factor(train_pred, levels = levels(train.df$Target))
+
+# Create confusion matrix for the training set
+conf_matrix_train <- confusionMatrix(train_pred, train.df$Target)
+
+# Print the confusion matrix
+print("Confusion Matrix - Training Set:")
+print(conf_matrix_train)
+
+
+# Make predictions on the validation set
+valid_pred <- predict(nb_model, valid.df)
+
+# Ensure valid_pred is a factor with the same levels as the Target variable
+valid.df$Target <- factor(valid.df$Target)
+valid_pred <- factor(valid_pred, levels = levels(valid.df$Target))
+
+# Create confusion matrix for the validation set
+conf_matrix_valid <- confusionMatrix(valid_pred, valid.df$Target)
+
+# Print the confusion matrix
+print("Confusion Matrix - Validation Set:")
+print(conf_matrix_valid)
+```
+
+
+
+The confusion matrices for both the training and validation sets indicate that the Naive Bayes model primarily predicts the "No" class, resulting in high accuracy rates of approximately 82.32% for the training set and 78.69% for the validation set. However, the model fails to predict any instances of the "Yes" class, leading to a sensitivity of 100% for the "No" class but a specificity of 0%. This means that while the model accurately identifies negative cases, it completely misses positive cases, suggesting a significant imbalance in the dataset or that the model is biased towards predicting the majority class. The kappa statistic indicates poor agreement beyond chance, emphasizing the need for further refinement, such as balancing the dataset or adjusting model parameters to improve its predictive performance on minority classes.
+
+
+
+
+
+
